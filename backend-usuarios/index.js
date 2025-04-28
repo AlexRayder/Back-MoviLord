@@ -1,11 +1,21 @@
 const express = require('express');
-const cors = require('cors');
+const cors = require('cors'); // Asegúrate de importar cors
 const app = express();
 const { sequelize, Role } = require('./models');
 require('dotenv').config();
 
+// Habilitar CORS para todas las solicitudes
+app.use(cors()); // Esto permite todas las solicitudes desde cualquier origen
+
+// Si solo deseas permitir solicitudes de un dominio específico (como el frontend en `http://localhost:4200`):
+/* 
+app.use(cors({
+  origin: 'http://localhost:4200', // Cambia esta URL según tu frontend
+  methods: 'GET,POST,PUT,DELETE',
+}));
+*/
+
 // Middlewares
-app.use(cors());
 app.use(express.json());
 
 // Rutas

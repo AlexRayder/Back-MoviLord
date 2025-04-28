@@ -11,15 +11,14 @@ const createUser = async (req, res) => {
     firstName,
     lastName,
     email,
-    phone,
     profileImage
   } = req.body;
 
   try {
-    // Verificar si el username, email o phone ya existen en la base de datos
+    // Verificar si el username o email ya existen en la base de datos
     const existingUser = await User.findOne({
       where: {
-        [Op.or]: [{ username }, { email }, { phone }]
+        [Op.or]: [{ username }, { email }]
       }
     });
 
@@ -27,7 +26,6 @@ const createUser = async (req, res) => {
       const errors = [];
       if (existingUser.username === username) errors.push('El username ya está registrado.');
       if (existingUser.email === email) errors.push('El correo electrónico ya está registrado.');
-      if (existingUser.phone === phone) errors.push('El número de teléfono ya está registrado.');
 
       return res.status(400).json({ errors });
     }
@@ -44,7 +42,6 @@ const createUser = async (req, res) => {
       firstName,
       lastName,
       email,
-      phone,
       profileImage,
       roleId: normalRole.id
     });
