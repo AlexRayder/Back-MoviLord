@@ -1,31 +1,25 @@
 const express = require('express');
-const cors = require('cors'); // Asegúrate de importar cors
+const cors = require('cors');
 const app = express();
 const { sequelize, Role } = require('./models');
 require('dotenv').config();
 
-// Habilitar CORS para todas las solicitudes
-app.use(cors()); // Esto permite todas las solicitudes desde cualquier origen
+// CORS
+app.use(cors());
 
-// Si solo deseas permitir solicitudes de un dominio específico (como el frontend en `http://localhost:4200`):
-/* 
-app.use(cors({
-  origin: 'http://localhost:4200', // Cambia esta URL según tu frontend
-  methods: 'GET,POST,PUT,DELETE',
-}));
-*/
-
-// Middlewares
-app.use(express.json());
+// Middleware con límite aumentado
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Rutas
 app.use('/api', require('./routes/user.routes'));
+app.use('/api/videos', require('./routes/video.routes'));
+app.use('/uploads', express.static('uploads'));
 
-// Sincronizar DB y crear roles iniciales sin borrar los datos existentes
+// DB Sync y creación de roles
 sequelize.sync({ alter: true }).then(async () => {
   console.log('DB conectada');
 
-  // Solo crear roles si no existen
   const count = await Role.count();
   if (count === 0) {
     await Role.bulkCreate([

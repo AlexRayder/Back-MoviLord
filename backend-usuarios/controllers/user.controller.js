@@ -64,11 +64,13 @@ const getUsers = async (req, res) => {
   }
 };
 
-const getUserByUsername = async (req, res) => {
-  const { username } = req.params;
+const getUserById = async (req, res) => {
+  const { id } = req.params;
 
   try {
-    const user = await User.findOne({ where: { username } });
+    const user = await User.findByPk(id, {
+      include: [{ model: Role, attributes: ['name'] }]
+    });
 
     if (!user) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -79,6 +81,7 @@ const getUserByUsername = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
 
 const deleteUserById = async (req, res) => {
   const { id } = req.params;
@@ -98,7 +101,37 @@ const deleteUserById = async (req, res) => {
   }
 };
 
+const updateUserById = async (req, res) => {
+  const { id } = req.params;
+  const {
+    firstName,
+    lastName,
+    phone,
+    profileImage
+  } = req.body;
+
+  try {
+    const user = await User.findByPk(id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    user.firstName = firstName;
+    user.lastName = lastName;
+    user.phone = phone;
+    user.profileImage = profileImage;
+
+    await user.save();
+
+    res.status(200).json({ message: 'Usuario actualizado correctamente', user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
 
 
 
-module.exports = { createUser, getUsers,getUserByUsername,deleteUserById };
+
+
+module.exports = { createUser, getUsers, getUserById, deleteUserById, updateUserById };
