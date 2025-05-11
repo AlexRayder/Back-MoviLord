@@ -21,4 +21,6 @@ User.hasMany(Video, { foreignKey: 'userId', as: 'videos' });
 Video.belongsTo(VideoVisibility, { foreignKey: 'visibilityId', as: 'visibility' });
 VideoVisibility.hasMany(Video, { foreignKey: 'visibilityId', as: 'videos' });
 
+
+
 module.exports = Video;

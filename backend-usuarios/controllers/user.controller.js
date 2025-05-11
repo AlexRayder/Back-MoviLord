@@ -1,4 +1,6 @@
 const { User, Role } = require('../models');
+const Subscription = require('../models/subscription.model');
+const Channel = require('../models/channel.model');
 const { Op } = require('sequelize');
 const bcrypt = require('bcrypt');
 const saltRounds = 10; // Número de rondas de sal que se van a utilizar para encriptar
@@ -11,7 +13,8 @@ const createUser = async (req, res) => {
     firstName,
     lastName,
     email,
-    profileImage
+    profileImage,
+    bannerImage // Aquí agregamos el bannerImage, que sería el archivo cargado por el usuario
   } = req.body;
 
   try {
@@ -46,12 +49,25 @@ const createUser = async (req, res) => {
       roleId: normalRole.id
     });
 
-    res.status(201).json(newUser);
+    // Verificar si se proporcionó una imagen de banner
+    const bannerUrl = bannerImage || '/imgs/banner.png'; 
+
+    // Crear el canal con el banner proporcionado o el predeterminado
+    const newChannel = await Channel.create({
+      userId: newUser.id, // Asociar el canal con el nuevo usuario
+      bannerUrl: bannerUrl, // Usar el banner proporcionado o predeterminado
+    });
+
+    // Devolver el usuario y canal creado
+    res.status(201).json({
+      user: newUser,
+      channel: newChannel
+    });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
-
 
 const getUsers = async (req, res) => {
   try {
@@ -76,11 +92,20 @@ const getUserById = async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
+    // Obtener total de suscriptores (usuarios que están suscritos a este usuario)
+    const totalSubscribers = await Subscription.count({
+      where: { subscribedToId: id }
+    });
+
+    // Agregarlo a los datos del usuario
+    user.dataValues.totalSubscribers = totalSubscribers;
+
     res.status(200).json(user);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
+
 
 
 const deleteUserById = async (req, res) => {

@@ -21,6 +21,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api', require('./routes/user.routes'));
 app.use('/api/videos', require('./routes/video.routes'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/api/subscriptions', require('./routes/subscription.routes'));
+app.use('/api/channel', require('./routes/channel.routes'));
+app.use('/imgs', express.static(path.join(__dirname, 'imgs')));
 
 // Sincronización de base de datos y datos iniciales
 sequelize.sync({ alter: alterDB }).then(async () => {

@@ -5,6 +5,7 @@ const Like = require('../models/like.model');
 const Dislike = require('../models/dislike.model');
 const Comment = require('../models/comment.model');
 const View = require('../models/view.model');
+const Subscription = require('../models/subscription.model');
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
@@ -71,7 +72,7 @@ const getAllVideos = async (req, res) => {
   try {
     const videos = await Video.findAll({
       include: [
-        { model: User, as: 'user', attributes: ['username', 'profileImage'] },
+        { model: User, as: 'user', attributes: ['id', 'username', 'profileImage'] },
         { model: VideoVisibility, as: 'visibility', attributes: ['name'] }
       ],
       order: [['createdAt', 'DESC']]
@@ -89,7 +90,7 @@ const getVideoById = async (req, res) => {
   try {
     const video = await Video.findByPk(id, {
       include: [
-        { model: User, as: 'user', attributes: ['username', 'profileImage'] },
+        { model: User, as: 'user', attributes: ['id', 'username', 'profileImage'] },
         { model: VideoVisibility, as: 'visibility', attributes: ['name'] },
         {
           model: Comment,
@@ -97,24 +98,49 @@ const getVideoById = async (req, res) => {
           include: [
             { model: User, as: 'user', attributes: ['username', 'profileImage'] }
           ]
-        }
+        },
+        { model: View, as: 'views', attributes: ['id'] }
       ]
     });
+
 
     if (!video) {
       return res.status(404).json({ error: 'Video no encontrado' });
     }
 
+    // Contar la vista solo si el usuario no la ha registrado antes
+    const alreadyViewed = await View.findOne({ where: { videoId: id, userId } });
+
+    if (!alreadyViewed) {
+      await View.create({ videoId: id, userId });
+
+      // Si estás usando un campo de contador en el modelo (opcional)
+      if (typeof video.views === 'number') {
+        video.views += 1;
+        await video.save();
+      }
+    }
+
+    // Contar total de vistas
+    const totalViews = await View.count({ where: { videoId: id } });
+
+
+    // Likes y dislikes
     const likeCount = await Like.count({ where: { videoId: video.id } });
     const dislikeCount = await Dislike.count({ where: { videoId: video.id } });
 
     const userLiked = await Like.findOne({ where: { videoId: video.id, userId } });
     const userDisliked = await Dislike.findOne({ where: { videoId: video.id, userId } });
 
+    const totalSubscribers = await Subscription.count({ where: { subscribedToId: video.user.id } });
+
+
     video.dataValues.likes = likeCount;
     video.dataValues.dislikes = dislikeCount;
     video.dataValues.userLiked = !!userLiked;
     video.dataValues.userDisliked = !!userDisliked;
+    video.dataValues.totalSubscribers = totalSubscribers;
+    video.dataValues.totalViews = totalViews;
 
     res.json(video);
   } catch (error) {
@@ -124,16 +150,15 @@ const getVideoById = async (req, res) => {
 };
 
 
-
-// Obtener videos por usuario
 const getVideosByUser = async (req, res) => {
   const { userId } = req.params;
 
   try {
+    // Buscar todos los videos de un usuario
     const videos = await Video.findAll({
       where: { userId },
       include: [
-        { model: User, as: 'user', attributes: ['username', 'profileImage'] },
+        { model: User, as: 'user', attributes: ['id', 'username', 'profileImage'] },
         { model: VideoVisibility, as: 'visibility', attributes: ['name'] },
         {
           model: Comment,
@@ -143,26 +168,32 @@ const getVideosByUser = async (req, res) => {
       ]
     });
 
-    // Agrega los likes y dislikes a cada video
+    // Agregar likes, dislikes y total de suscriptores a cada video
     const videosWithCounts = await Promise.all(
       videos.map(async (video) => {
         const likes = await Like.count({ where: { videoId: video.id } });
         const dislikes = await Dislike.count({ where: { videoId: video.id } });
+        const totalSubscribers = await Subscription.count({ where: { subscribedToId: video.user.id } });
+        const totalViews = await View.count({ where: { videoId: video.id } }); // Aquí corregido
 
-        return {
-          ...video.toJSON(),
-          likes,
-          dislikes
-        };
+        // Agregar los contadores a los datos del video
+        video.dataValues.likes = likes;
+        video.dataValues.dislikes = dislikes;
+        video.dataValues.totalSubscribers = totalSubscribers;
+        video.dataValues.totalViews = totalViews;
+
+        // Devolver el video con sus contadores
+        return video.toJSON();
       })
     );
 
-    res.json(videosWithCounts);
+    res.status(200).json(videosWithCounts);
   } catch (err) {
-    console.error(err);
+    console.error('Error en getVideosByUser:', err);
     res.status(500).json({ error: err.message });
   }
 };
+
 
 
 // Agregar like
