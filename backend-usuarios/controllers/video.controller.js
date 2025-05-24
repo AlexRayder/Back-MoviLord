@@ -22,16 +22,33 @@ const uploadVideo = async (req, res) => {
     const videoFile = req.files.video[0];
     const thumbnailFile = req.files.thumbnail?.[0];
 
-    const videoUrl = `/uploads/videos/${videoFile.filename}`;
+    // 🟢 Obtener datos del usuario
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    // 🟢 Crear carpeta específica del usuario
+    const userFolderName = `${user.id}_${user.username.replace(/\s+/g, '_')}`;
+    const userVideoFolder = path.join(__dirname, '..', 'uploads', 'videos', userFolderName);
+    const userThumbnailFolder = path.join(__dirname, '..', 'uploads', 'thumbnails', userFolderName);
+    fs.mkdirSync(userVideoFolder, { recursive: true });
+    fs.mkdirSync(userThumbnailFolder, { recursive: true });
+
+    // 🟢 Mover archivo de video a la carpeta del usuario
+    const videoPath = path.join(userVideoFolder, videoFile.originalname);
+    fs.renameSync(videoFile.path, videoPath); // mover archivo
+
     let thumbnailUrl;
 
+    // 🟢 Si hay miniatura, moverla también
     if (thumbnailFile) {
-      thumbnailUrl = `/uploads/thumbnails/${thumbnailFile.filename}`;
+      const thumbnailPath = path.join(userThumbnailFolder, thumbnailFile.originalname);
+      fs.renameSync(thumbnailFile.path, thumbnailPath);
+      thumbnailUrl = `/uploads/thumbnails/${userFolderName}/${thumbnailFile.originalname}`;
     } else {
-      const videoPath = path.join(__dirname, '..', 'uploads', 'videos', videoFile.filename);
-      const generatedThumbnail = path.join(__dirname, '..', 'uploads', 'thumbnails', `${videoFile.filename}.png`);
-
-      fs.mkdirSync(path.dirname(generatedThumbnail), { recursive: true });
+      // 🟢 Generar miniatura automáticamente
+      const generatedThumbnailPath = path.join(userThumbnailFolder, `${path.parse(videoFile.originalname).name}.png`);
 
       await new Promise((resolve, reject) => {
         ffmpeg(videoPath)
@@ -39,13 +56,15 @@ const uploadVideo = async (req, res) => {
           .on('error', reject)
           .screenshots({
             count: 1,
-            folder: path.dirname(generatedThumbnail),
-            filename: path.basename(generatedThumbnail),
+            folder: userThumbnailFolder,
+            filename: path.basename(generatedThumbnailPath),
           });
       });
 
-      thumbnailUrl = `/uploads/thumbnails/${videoFile.filename}.png`;
+      thumbnailUrl = `/uploads/thumbnails/${userFolderName}/${path.parse(videoFile.originalname).name}.png`;
     }
+
+    const videoUrl = `/uploads/videos/${userFolderName}/${videoFile.originalname}`;
 
     const visibilityRecord = await VideoVisibility.findOne({ where: { name: visibility } });
     if (!visibilityRecord) {
@@ -66,6 +85,7 @@ const uploadVideo = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
 
 // Obtener todos los videos
 const getAllVideos = async (req, res) => {
